@@ -10,7 +10,7 @@ const state = {
 };
 
 // ==================================================
-// REQUIRED HEADERS (GLOBAL TRUTH – LOCKED)
+// REQUIRED HEADERS (LOCKED)
 // ==================================================
 const REQUIRED_HEADERS = {
   sale: [
@@ -76,7 +76,7 @@ function handleFile(event, type) {
 }
 
 // ==================================================
-// LOAD SKU MAPPING (STATIC, NORMALIZED)
+// LOAD SKU MAPPING
 // ==================================================
 fetch("data/sku_mapping.csv")
   .then(res => res.text())
@@ -89,22 +89,15 @@ fetch("data/sku_mapping.csv")
   });
 
 // ==================================================
-// ROBUST CSV PARSER (FINAL, IMMUTABLE)
+// ROBUST CSV PARSER (LOCKED)
 // ==================================================
 function parseCSV(text) {
   text = text.replace(/^\uFEFF/, "").trim();
   const lines = text.split(/\r?\n/);
-  if (!lines.length) throw new Error("Empty file");
-
   const delimiter = detectDelimiter(lines[0]);
 
-  const headers = normalize(
-    lines[0].split(delimiter)
-  );
-
-  const rows = lines.slice(1).map(line =>
-    normalize(line.split(delimiter))
-  );
+  const headers = normalize(lines[0].split(delimiter));
+  const rows = lines.slice(1).map(l => normalize(l.split(delimiter)));
 
   return { headers, rows };
 }
@@ -117,15 +110,12 @@ function detectDelimiter(line) {
 
 function normalize(arr) {
   return arr.map(v =>
-    v
-      .replace(/^"|"$/g, "")
-      .replace(/^\uFEFF/, "")
-      .trim()
+    v.replace(/^"|"$/g, "").replace(/^\uFEFF/, "").trim()
   );
 }
 
 // ==================================================
-// HEADER VALIDATION
+// VALIDATION
 // ==================================================
 function validateHeaders(headers, required) {
   required.forEach(h => {
@@ -135,9 +125,6 @@ function validateHeaders(headers, required) {
   });
 }
 
-// ==================================================
-// ENABLE BUTTON
-// ==================================================
 function checkAllValidated() {
   document.getElementById("generateBtn").disabled = !(
     state.sale &&
@@ -148,7 +135,7 @@ function checkAllValidated() {
 }
 
 // ==================================================
-// PHASE 2 AGGREGATION (UNCHANGED)
+// PHASE 2 – CORRECT AGGREGATION (UNION LOGIC)
 // ==================================================
 function generateAggregation() {
   log("Phase 2 aggregation started");
@@ -159,8 +146,8 @@ function generateAggregation() {
   const uniwareStock = {};
   state.uniware.forEach(r => uniwareStock[r[0]] = Number(r[1]) || 0);
 
-  const sales = {};
-  const returns = {};
+  const salesAgg = {};
+  const returnAgg = {};
 
   state.sale.forEach(r => {
     const txn = r[0];
@@ -170,31 +157,37 @@ function generateAggregation() {
     const key = `${sku}||${fc}`;
 
     if (txn === "Shipment" || txn === "FreeReplacement") {
-      sales[key] = (sales[key] || 0) + qty;
+      salesAgg[key] = (salesAgg[key] || 0) + qty;
     }
     if (txn === "Refund") {
-      returns[key] = (returns[key] || 0) + qty;
+      returnAgg[key] = (returnAgg[key] || 0) + qty;
     }
   });
 
   const latestDate = Math.max(...state.fba.map(r => new Date(r[0]).getTime()));
-  const fba = {};
+  const fbaAgg = {};
 
   state.fba.forEach(r => {
     if (new Date(r[0]).getTime() !== latestDate) return;
     if (r[2] !== "SELLABLE") return;
 
     const key = `${r[1]}||${r[4]}`;
-    fba[key] = (fba[key] || 0) + (Number(r[3]) || 0);
+    fbaAgg[key] = (fbaAgg[key] || 0) + (Number(r[3]) || 0);
   });
+
+  const allKeys = new Set([
+    ...Object.keys(salesAgg),
+    ...Object.keys(returnAgg),
+    ...Object.keys(fbaAgg)
+  ]);
 
   state.working = [];
 
-  Object.keys(fba).forEach(key => {
+  allKeys.forEach(key => {
     const [sku, fc] = key.split("||");
-    const sale = sales[key] || 0;
-    const ret = returns[key] || 0;
-    const stock = fba[key];
+    const sale = salesAgg[key] || 0;
+    const ret = returnAgg[key] || 0;
+    const stock = fbaAgg[key] || 0;
 
     if (sale === 0 && stock === 0) return;
 
