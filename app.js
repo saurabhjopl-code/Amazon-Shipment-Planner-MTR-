@@ -7,7 +7,7 @@ const state = {
   working: []
 };
 
-// ================= REQUIRED HEADERS =================
+// ================= REQUIRED HEADERS (LOCKED) =================
 const REQUIRED_HEADERS = {
   sale: ["Transaction Type","Sku","Quantity","Warehouse Id","Fulfillment Channel"],
   fba: ["Date","MSKU","Disposition","Ending Warehouse Balance","Location"],
@@ -35,10 +35,12 @@ function loadFile(e,type){
       state[type]=p;
       status.textContent="Validated";
       status.className="status valid";
+      log(type.toUpperCase()+" validated");
     }catch(err){
       state[type]=null;
       status.textContent=err.message;
       status.className="status error";
+      log(err.message);
     }
     checkReady();
   };
@@ -46,32 +48,55 @@ function loadFile(e,type){
 }
 
 // ================= SKU MAP =================
-fetch("data/sku_mapping.csv").then(r=>r.text()).then(t=>{
-  const p=parseCSV(t);
-  validateHeaders(p.headers,REQUIRED_HEADERS.mapping);
-  state.mapping=p;
-  checkReady();
-});
+fetch("data/sku_mapping.csv")
+  .then(r=>r.text())
+  .then(t=>{
+    const p=parseCSV(t);
+    validateHeaders(p.headers,REQUIRED_HEADERS.mapping);
+    state.mapping=p;
+    log("SKU Mapping loaded");
+    checkReady();
+  });
 
-// ================= CSV =================
+// ================= CSV PARSER (HARD-LOCKED) =================
 function parseCSV(text){
-  text=text.replace(/^\uFEFF/,"").trim();
-  const lines=text.split(/\r?\n/);
-  const d=lines[0].includes("\t")?"\t":",";
-  const headers=lines[0].split(d).map(h=>h.trim());
-  const rows=lines.slice(1).map(l=>l.split(d).map(c=>c.trim()));
-  const index={}; headers.forEach((h,i)=>index[h]=i);
-  return {headers,rows,index};
+  text = text.replace(/^\uFEFF/, "").trim();
+  const lines = text.split(/\r?\n/);
+  const d = lines[0].includes("\t") ? "\t" : lines[0].includes(";") ? ";" : ",";
+
+  const headers = lines[0].split(d).map(h => normalize(h));
+  const rows = lines.slice(1).map(l =>
+    l.split(d).map(c => normalize(c))
+  );
+
+  const index = {};
+  headers.forEach((h,i)=>index[h]=i);
+  return { headers, rows, index };
 }
 
-function validateHeaders(h,r){r.forEach(x=>{if(!h.includes(x))throw Error("Missing header: "+x);});}
+function normalize(v){
+  return v
+    .replace(/^"|"$/g,"")
+    .replace(/^\uFEFF/,"")
+    .trim();
+}
+
+// ================= VALIDATION =================
+function validateHeaders(headers, required){
+  required.forEach(h=>{
+    if(!headers.includes(h)){
+      throw new Error("Missing header: " + h);
+    }
+  });
+}
+
 function checkReady(){
-  document.getElementById("generateBtn").disabled=!(
+  document.getElementById("generateBtn").disabled = !(
     state.sale && state.fba && state.uniware && state.mapping
   );
 }
 
-// ================= REPORT =================
+// ================= REPORT (UNCHANGED V1.2 LOGIC) =================
 function generateReport(){
   state.working=[];
   const skuMap={}, uniware={}, sales={}, returns={}, fba={};
@@ -97,12 +122,17 @@ function generateReport(){
     const channel=r[state.sale.index["Fulfillment Channel"]];
     const key=sku+"||"+fc+"||"+channel;
 
-    if(txn.startsWith("Shipment")||txn.startsWith("FreeReplacement")) sales[key]=(sales[key]||0)+qty;
-    if(txn.startsWith("Refund")) returns[key]=(returns[key]||0)+qty;
+    if(txn.startsWith("Shipment")||txn.startsWith("FreeReplacement"))
+      sales[key]=(sales[key]||0)+qty;
+    if(txn.startsWith("Refund"))
+      returns[key]=(returns[key]||0)+qty;
   });
 
   // FBA
-  const parseDate=d=>{const[a,b,c]=d.split("-");return new Date(`${c}-${b}-${a}`).getTime();};
+  const parseDate=d=>{
+    const[a,b,c]=d.split("-");
+    return new Date(`${c}-${b}-${a}`).getTime();
+  };
   const f=state.fba;
   const latest=Math.max(...f.rows.map(r=>parseDate(r[f.index["Date"]])));
 
@@ -140,9 +170,17 @@ function generateReport(){
     }
 
     state.working.push({
-      sku, fc:fc||"Seller", channel,
-      stock, uw, sale,
-      drr, sc, send, recall, decision
+      sku,
+      fc: fc || "Seller",
+      channel,
+      stock,
+      uw,
+      sale,
+      drr,
+      sc,
+      send,
+      recall,
+      decision
     });
   });
 
@@ -155,10 +193,10 @@ function renderSections(){
 
   state.working.forEach(r=>{
     if(r.channel==="MFN"){
-      mfn[r.fc] = mfn[r.fc] || [];
+      mfn[r.fc]=mfn[r.fc]||[];
       mfn[r.fc].push(r);
     }else{
-      afn[r.fc] = afn[r.fc] || [];
+      afn[r.fc]=afn[r.fc]||[];
       afn[r.fc].push(r);
     }
   });
@@ -191,11 +229,12 @@ function showTable(fc,groups,tabId,contentId){
     t.classList.toggle("active",t.textContent===fc);
   });
   const rows=groups[fc];
-  document.getElementById(contentId).innerHTML=buildSummary(rows)+buildTable(rows);
+  document.getElementById(contentId).innerHTML=
+    buildSummary(rows)+buildTable(rows);
 }
 
 function buildSummary(rows){
-  const sum=(k)=>rows.reduce((a,r)=>a+(r[k]||0),0);
+  const sum=k=>rows.reduce((a,r)=>a+(r[k]||0),0);
   const sale=sum("sale"), stock=sum("stock");
   const drr=sale/30;
   const sc=drr?stock/drr:0;
@@ -228,4 +267,8 @@ function buildTable(rows){
     </tr>`;
   });
   return h+"</table>";
+}
+
+function log(m){
+  document.getElementById("logBox").textContent+=m+"\n";
 }
