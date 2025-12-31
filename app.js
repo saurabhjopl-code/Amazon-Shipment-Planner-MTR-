@@ -55,7 +55,7 @@ fetch("data/sku_mapping.csv")
     checkReady();
   });
 
-// ================= CSV PARSER (LOCKED) =================
+// ================= CSV PARSER (HARD LOCKED) =================
 function parseCSV(text){
   text=text.replace(/^\uFEFF/,"").trim();
   const lines=text.split(/\r?\n/);
@@ -68,7 +68,11 @@ function parseCSV(text){
 function normalize(v){
   return v.replace(/^"|"$/g,"").replace(/^\uFEFF/,"").trim();
 }
-function validateHeaders(h,r){r.forEach(x=>{if(!h.includes(x))throw Error("Missing header: "+x);});}
+function validateHeaders(h,r){
+  r.forEach(x=>{
+    if(!h.includes(x)) throw new Error("Missing header: "+x);
+  });
+}
 function checkReady(){
   document.getElementById("generateBtn").disabled = !(
     state.sale && state.fba && state.uniware && state.mapping
@@ -90,15 +94,16 @@ function generateReport(){
       Number(r[state.uniware.index["Total Inventory"]])||0;
   });
 
-  // -------- SALES (Cancel removed, MFN preserved) --------
+  // -------- SALES --------
   state.sale.rows.forEach(r=>{
     const txn=r[state.sale.index["Transaction Type"]];
     if(txn.startsWith("Cancel")) return;
 
     const sku=r[state.sale.index["Sku"]];
     const qty=Number(r[state.sale.index["Quantity"]])||0;
-    const fc=r[state.sale.index["Warehouse Id"]] || "Seller";
+    const fc=r[state.sale.index["Warehouse Id"]] || "";
     const channel=r[state.sale.index["Fulfillment Channel"]];
+
     const key=sku+"||"+fc+"||"+channel;
 
     if(txn.startsWith("Shipment")||txn.startsWith("FreeReplacement"))
@@ -107,17 +112,22 @@ function generateReport(){
       returns[key]=(returns[key]||0)+qty;
   });
 
-  // -------- FBA STOCK (AFN only) --------
-  const parseDate=d=>{const[a,b,c]=d.split("-");return new Date(`${c}-${b}-${a}`).getTime();};
+  // -------- FBA STOCK (AFN ONLY) --------
+  const parseDate=d=>{
+    const[a,b,c]=d.split("-");
+    return new Date(`${c}-${b}-${a}`).getTime();
+  };
   const f=state.fba;
   const latest=Math.max(...f.rows.map(r=>parseDate(r[f.index["Date"]])));
 
   f.rows.forEach(r=>{
     if(parseDate(r[f.index["Date"]])!==latest) return;
     if(r[f.index["Disposition"]]!=="SELLABLE") return;
+
     const sku=r[f.index["MSKU"]];
     const fc=r[f.index["Location"]];
     const key=sku+"||"+fc+"||AFN";
+
     fba[key]=(fba[key]||0)+(Number(r[f.index["Ending Warehouse Balance"]])||0);
   });
 
@@ -125,10 +135,10 @@ function generateReport(){
 
   keys.forEach(k=>{
     const [sku,fc,channel]=k.split("||");
+
     const sale=sales[k]||0;
     const ret=returns[k]||0;
     const stock=fba[k]||0;
-
     if(!sale && !stock) return;
 
     const drr=sale/30;
@@ -147,7 +157,7 @@ function generateReport(){
 
     state.working.push({
       sku,
-      fc,
+      fc: fc || "Seller",
       channel,
       stock,
       uw,
@@ -165,12 +175,11 @@ function generateReport(){
 
 // ================= RENDER =================
 function renderSections(){
-  const afn={}, mfn={};
+  const afn={}, mfn={ Seller: [] };
 
   state.working.forEach(r=>{
-    if(r.channel==="MFN"){
-      mfn[r.fc]=mfn[r.fc]||[];
-      mfn[r.fc].push(r);
+    if(r.channel==="MFN" && r.fc==="Seller"){
+      mfn.Seller.push(r);
     }else{
       afn[r.fc]=afn[r.fc]||[];
       afn[r.fc].push(r);
