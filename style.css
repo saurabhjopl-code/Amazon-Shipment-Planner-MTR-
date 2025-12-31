@@ -43,26 +43,16 @@ h1 {
 }
 
 button {
-  margin: 10px 5px;
+  margin: 10px 0;
   padding: 10px 18px;
   font-size: 14px;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.export-section {
-  margin-top: 10px;
-  margin-bottom: 15px;
 }
 
 #fcTabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 15px;
+  margin: 15px 0;
 }
 
 .fc-tab {
@@ -91,6 +81,10 @@ th, td {
 
 th:first-child, td:first-child {
   text-align: left;
+}
+
+.load-btn {
+  margin-top: 10px;
 }
 
 #logBox {
