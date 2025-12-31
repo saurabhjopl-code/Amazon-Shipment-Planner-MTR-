@@ -67,10 +67,9 @@ button {
   color: #fff;
 }
 
-.summary-table {
-  margin-bottom: 12px;
-  background: #f9fafb;
-}
+/* =========================
+   TABLE STYLES
+   ========================= */
 
 table {
   width: 100%;
@@ -81,12 +80,58 @@ table {
 th, td {
   border: 1px solid #ccc;
   padding: 6px;
+}
+
+/* Default alignment */
+th {
+  text-align: left;
+}
+
+td {
   text-align: right;
 }
 
-th:first-child, td:first-child {
-  text-align: left;
+/* =========================
+   CENTER-ALIGNED COLUMNS
+   ========================= */
+
+/* Header alignment */
+th:nth-child(2),
+th:nth-child(3),
+th:nth-child(4),
+th:nth-child(5),
+th:nth-child(6),
+th:nth-child(8),
+th:nth-child(9) {
+  text-align: center;
 }
+
+/* Cell alignment */
+td:nth-child(2),
+td:nth-child(3),
+td:nth-child(4),
+td:nth-child(5),
+td:nth-child(6),
+td:nth-child(8),
+td:nth-child(9) {
+  text-align: center;
+}
+
+/* =========================
+   SUMMARY TABLE
+   ========================= */
+
+.summary-table {
+  margin-bottom: 12px;
+  background: #f9fafb;
+}
+
+.summary-table th,
+.summary-table td {
+  text-align: center;
+}
+
+/* ========================= */
 
 .load-btn {
   margin-top: 10px;
