@@ -5,14 +5,14 @@ body {
 }
 
 .app-container {
-  max-width: 1200px;
+  max-width: 1300px;
   margin: 30px auto;
   background: #fff;
   padding: 20px;
   border-radius: 6px;
 }
 
-h1 {
+h1, h2 {
   text-align: center;
 }
 
@@ -28,48 +28,32 @@ h1 {
   border-radius: 4px;
 }
 
-.status {
-  font-size: 13px;
-}
-
-.status.valid {
-  color: green;
-  font-weight: bold;
-}
-
-.status.error {
-  color: red;
-  font-weight: bold;
-}
+.status.valid { color: green; font-weight: bold; }
+.status.error { color: red; font-weight: bold; }
 
 button {
   margin: 10px 0;
   padding: 10px 18px;
-  font-size: 14px;
 }
 
-#fcTabs {
+.tab-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 15px 0;
+  margin: 10px 0;
 }
 
-.fc-tab {
+.tab {
   padding: 8px 14px;
   border: 1px solid #333;
   cursor: pointer;
   background: #f1f1f1;
 }
 
-.fc-tab.active {
+.tab.active {
   background: #333;
   color: #fff;
 }
-
-/* =========================
-   TABLE STYLES
-   ========================= */
 
 table {
   width: 100%;
@@ -80,61 +64,16 @@ table {
 th, td {
   border: 1px solid #ccc;
   padding: 6px;
+  text-align: center;
 }
 
-/* Default alignment */
-th {
+th:first-child, td:first-child {
   text-align: left;
 }
 
-td {
-  text-align: right;
-}
-
-/* =========================
-   CENTER-ALIGNED COLUMNS
-   ========================= */
-
-/* Header alignment */
-th:nth-child(2),
-th:nth-child(3),
-th:nth-child(4),
-th:nth-child(5),
-th:nth-child(6),
-th:nth-child(8),
-th:nth-child(9) {
-  text-align: center;
-}
-
-/* Cell alignment */
-td:nth-child(2),
-td:nth-child(3),
-td:nth-child(4),
-td:nth-child(5),
-td:nth-child(6),
-td:nth-child(8),
-td:nth-child(9) {
-  text-align: center;
-}
-
-/* =========================
-   SUMMARY TABLE
-   ========================= */
-
 .summary-table {
-  margin-bottom: 12px;
   background: #f9fafb;
-}
-
-.summary-table th,
-.summary-table td {
-  text-align: center;
-}
-
-/* ========================= */
-
-.load-btn {
-  margin-top: 10px;
+  margin-bottom: 10px;
 }
 
 #logBox {
