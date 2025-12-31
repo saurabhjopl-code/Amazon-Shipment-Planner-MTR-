@@ -47,13 +47,9 @@ document.getElementById("uniwareFile").addEventListener("change", e => handleFil
 document.getElementById("generateBtn").addEventListener("click", generateAggregation);
 
 // ==================================================
-// HANDLE FILE
-// ==================================================
 function handleFile(event, type) {
   const file = event.target.files[0];
   const statusEl = document.getElementById(type + "Status");
-
-  if (!file) return;
 
   const reader = new FileReader();
   reader.onload = () => {
@@ -65,11 +61,11 @@ function handleFile(event, type) {
       statusEl.className = "status valid";
       log(`${type.toUpperCase()} validated`);
       checkAllValidated();
-    } catch (err) {
+    } catch (e) {
       state[type] = null;
-      statusEl.textContent = err.message;
+      statusEl.textContent = e.message;
       statusEl.className = "status error";
-      log(err.message);
+      log(e.message);
     }
   };
   reader.readAsText(file);
@@ -79,63 +75,54 @@ function handleFile(event, type) {
 // LOAD SKU MAPPING
 // ==================================================
 fetch("data/sku_mapping.csv")
-  .then(res => res.text())
-  .then(text => {
-    const parsed = parseCSV(text);
-    validateHeaders(parsed.headers, REQUIRED_HEADERS.mapping);
-    state.mapping = parsed.rows;
+  .then(r => r.text())
+  .then(t => {
+    const p = parseCSV(t);
+    validateHeaders(p.headers, REQUIRED_HEADERS.mapping);
+    state.mapping = p.rows;
     log("SKU Mapping loaded");
     checkAllValidated();
   });
 
 // ==================================================
-// ROBUST CSV PARSER (LOCKED)
+// CSV PARSER (LOCKED)
 // ==================================================
 function parseCSV(text) {
   text = text.replace(/^\uFEFF/, "").trim();
   const lines = text.split(/\r?\n/);
-  const delimiter = detectDelimiter(lines[0]);
+  const d = detectDelimiter(lines[0]);
 
-  const headers = normalize(lines[0].split(delimiter));
-  const rows = lines.slice(1).map(l => normalize(l.split(delimiter)));
-
-  return { headers, rows };
+  return {
+    headers: normalize(lines[0].split(d)),
+    rows: lines.slice(1).map(l => normalize(l.split(d)))
+  };
 }
 
-function detectDelimiter(line) {
-  if (line.includes("\t")) return "\t";
-  if (line.includes(";")) return ";";
+function detectDelimiter(l) {
+  if (l.includes("\t")) return "\t";
+  if (l.includes(";")) return ";";
   return ",";
 }
 
 function normalize(arr) {
-  return arr.map(v =>
-    v.replace(/^"|"$/g, "").replace(/^\uFEFF/, "").trim()
-  );
+  return arr.map(v => v.replace(/^"|"$/g, "").trim());
 }
 
 // ==================================================
-// VALIDATION
-// ==================================================
-function validateHeaders(headers, required) {
-  required.forEach(h => {
-    if (!headers.includes(h)) {
-      throw new Error(`Missing required header: ${h}`);
-    }
+function validateHeaders(h, r) {
+  r.forEach(x => {
+    if (!h.includes(x)) throw new Error(`Missing required header: ${x}`);
   });
 }
 
 function checkAllValidated() {
   document.getElementById("generateBtn").disabled = !(
-    state.sale &&
-    state.fba &&
-    state.uniware &&
-    state.mapping
+    state.sale && state.fba && state.uniware && state.mapping
   );
 }
 
 // ==================================================
-// PHASE 2 – CORRECT AGGREGATION (UNION LOGIC)
+// 🔥 PHASE 2 – FINAL, CORRECT AGGREGATION
 // ==================================================
 function generateAggregation() {
   log("Phase 2 aggregation started");
@@ -146,8 +133,8 @@ function generateAggregation() {
   const uniwareStock = {};
   state.uniware.forEach(r => uniwareStock[r[0]] = Number(r[1]) || 0);
 
-  const salesAgg = {};
-  const returnAgg = {};
+  const sales = {};
+  const returns = {};
 
   state.sale.forEach(r => {
     const txn = r[0];
@@ -156,38 +143,44 @@ function generateAggregation() {
     const fc = r[5];
     const key = `${sku}||${fc}`;
 
-    if (txn === "Shipment" || txn === "FreeReplacement") {
-      salesAgg[key] = (salesAgg[key] || 0) + qty;
+    if (txn.startsWith("Shipment") || txn.startsWith("FreeReplacement")) {
+      sales[key] = (sales[key] || 0) + qty;
     }
-    if (txn === "Refund") {
-      returnAgg[key] = (returnAgg[key] || 0) + qty;
+    if (txn.startsWith("Refund")) {
+      returns[key] = (returns[key] || 0) + qty;
     }
   });
 
-  const latestDate = Math.max(...state.fba.map(r => new Date(r[0]).getTime()));
-  const fbaAgg = {};
+  // parse DD-MM-YYYY safely
+  const parseDate = d => {
+    const [dd, mm, yy] = d.split("-");
+    return new Date(`${yy}-${mm}-${dd}`).getTime();
+  };
+
+  const latestDate = Math.max(...state.fba.map(r => parseDate(r[0])));
+  const fba = {};
 
   state.fba.forEach(r => {
-    if (new Date(r[0]).getTime() !== latestDate) return;
+    if (parseDate(r[0]) !== latestDate) return;
     if (r[2] !== "SELLABLE") return;
 
     const key = `${r[1]}||${r[4]}`;
-    fbaAgg[key] = (fbaAgg[key] || 0) + (Number(r[3]) || 0);
+    fba[key] = (fba[key] || 0) + (Number(r[3]) || 0);
   });
 
   const allKeys = new Set([
-    ...Object.keys(salesAgg),
-    ...Object.keys(returnAgg),
-    ...Object.keys(fbaAgg)
+    ...Object.keys(sales),
+    ...Object.keys(returns),
+    ...Object.keys(fba)
   ]);
 
   state.working = [];
 
-  allKeys.forEach(key => {
-    const [sku, fc] = key.split("||");
-    const sale = salesAgg[key] || 0;
-    const ret = returnAgg[key] || 0;
-    const stock = fbaAgg[key] || 0;
+  allKeys.forEach(k => {
+    const [sku, fc] = k.split("||");
+    const sale = sales[k] || 0;
+    const ret = returns[k] || 0;
+    const stock = fba[k] || 0;
 
     if (sale === 0 && stock === 0) return;
 
@@ -207,8 +200,6 @@ function generateAggregation() {
 }
 
 // ==================================================
-// LOG
-// ==================================================
-function log(msg) {
-  document.getElementById("logBox").textContent += msg + "\n";
+function log(m) {
+  document.getElementById("logBox").textContent += m + "\n";
 }
